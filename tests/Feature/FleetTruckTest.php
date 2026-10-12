@@ -40,6 +40,7 @@ class FleetTruckTest extends TestCase
             ])
             ->assertCreated()
             ->assertJsonPath('data.capacity_tons', '32.00')
+            ->assertJsonPath('data.trip_load_limit_tons', '25.00')
             ->assertJsonPath('data.volume_cbm', '80.50')
             ->assertJsonPath('data.cargo_length_m', '13.60')
             ->assertJsonPath('data.cargo_width_m', '2.45')
@@ -51,6 +52,40 @@ class FleetTruckTest extends TestCase
             'volume_cbm' => 80.5,
             'axle_count' => 4,
         ]);
+    }
+
+    public function test_trip_load_limit_defaults_to_25_tons_without_exceeding_capacity(): void
+    {
+        $provider = $this->makeProvider();
+
+        $this->actingAs($provider, 'sanctum')
+            ->postJson('/api/v1/trucks', [
+                'plate_number' => 'H 2210',
+                'type' => 'dump',
+                'capacity_tons' => 8,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.trip_load_limit_tons', '8.00');
+
+        $this->actingAs($provider, 'sanctum')
+            ->postJson('/api/v1/trucks', [
+                'plate_number' => 'H 2211',
+                'type' => 'flatbed',
+                'capacity_tons' => 40,
+                'trip_load_limit_tons' => 30,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.trip_load_limit_tons', '30.00');
+
+        $this->actingAs($provider, 'sanctum')
+            ->postJson('/api/v1/trucks', [
+                'plate_number' => 'H 2212',
+                'type' => 'flatbed',
+                'capacity_tons' => 20,
+                'trip_load_limit_tons' => 30,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('trip_load_limit_tons');
     }
 
     public function test_provider_can_clear_optional_load_specifications(): void

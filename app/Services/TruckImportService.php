@@ -33,6 +33,10 @@ class TruckImportService
         'capacity' => 'capacity_tons',
         'السعة' => 'capacity_tons',
         'الحمولة' => 'capacity_tons',
+        'trip_load_limit_tons' => 'trip_load_limit_tons',
+        'trip load limit' => 'trip_load_limit_tons',
+        'حد الحمولة' => 'trip_load_limit_tons',
+        'حد الحمولة لكل رحلة' => 'trip_load_limit_tons',
         'volume_cbm' => 'volume_cbm',
         'volume' => 'volume_cbm',
         'الحجم' => 'volume_cbm',
@@ -176,6 +180,7 @@ class TruckImportService
             'plate_number' => $data['plate_number'] ?? null,
             'type' => $type,
             'capacity_tons' => $data['capacity_tons'] ?? null,
+            'trip_load_limit_tons' => $this->tripLoadLimit($data),
             'volume_cbm' => $data['volume_cbm'] ?? null,
             'cargo_length_m' => $data['cargo_length_m'] ?? null,
             'cargo_width_m' => $data['cargo_width_m'] ?? null,
@@ -199,6 +204,7 @@ class TruckImportService
             ],
             'type' => ['required', 'string', 'max:32', new UsableTruckType($actor)],
             'capacity_tons' => ['required', 'numeric', 'min:0.1'],
+            'trip_load_limit_tons' => ['required', 'numeric', 'min:0.1', 'lte:capacity_tons'],
             'volume_cbm' => ['nullable', 'numeric', 'min:0.01', 'max:9999'],
             'cargo_length_m' => ['nullable', 'numeric', 'min:0.01', 'max:50'],
             'cargo_width_m' => ['nullable', 'numeric', 'min:0.01', 'max:10'],
@@ -211,7 +217,25 @@ class TruckImportService
             'insurance_expires_at' => ['nullable', 'date'],
         ], [
             'plate_number.unique' => 'A truck with this plate number already exists.',
+            'trip_load_limit_tons.lte' => 'The trip load limit cannot exceed the truck capacity.',
+            'trip_load_limit_tons.min' => 'Enter a trip load limit of at least 0.1 tons.',
         ])->validate();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function tripLoadLimit(array $data): mixed
+    {
+        if (filled($data['trip_load_limit_tons'] ?? null)) {
+            return $data['trip_load_limit_tons'];
+        }
+
+        $capacity = $data['capacity_tons'] ?? null;
+
+        return is_numeric($capacity)
+            ? Truck::defaultTripLoadLimit((float) $capacity)
+            : null;
     }
 
     /**

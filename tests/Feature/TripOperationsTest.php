@@ -115,6 +115,44 @@ class TripOperationsTest extends TestCase
         $this->assertNotNull(Trip::query()->whereKey($tripId)->value('arrived_pickup_at'));
     }
 
+    public function test_assignment_uses_the_trip_load_limit_instead_of_full_capacity(): void
+    {
+        [$customer, $admin] = $this->makeActors();
+        $tripId = $this->acceptedPlatformTrip($customer, $admin);
+        Trip::query()->whereKey($tripId)->update(['planned_quantity' => 30]);
+
+        $driverId = $this->actingAs($admin, 'sanctum')->postJson('/api/v1/drivers', [
+            'name' => 'Afzal',
+            'phone' => '99331131',
+        ])->assertCreated()->json('data.driver.id');
+        $truckId = $this->actingAs($admin, 'sanctum')->postJson('/api/v1/trucks', [
+            'plate_number' => 'MX 4425',
+            'type' => TruckType::Flatbed->value,
+            'capacity_tons' => 40,
+        ])->assertCreated()->json('data.id');
+
+        $this->actingAs($admin, 'sanctum')->postJson("/api/v1/trips/{$tripId}/assign", [
+            'truck_id' => $truckId,
+            'driver_id' => $driverId,
+            'departure_time' => '10:00',
+            'driver_pay_amount' => 12,
+        ])->assertUnprocessable()->assertJsonValidationErrors('truck_id');
+
+        $this->actingAs($admin, 'sanctum')->putJson("/api/v1/trucks/{$truckId}", [
+            'plate_number' => 'MX 4425',
+            'type' => TruckType::Flatbed->value,
+            'capacity_tons' => 40,
+            'trip_load_limit_tons' => 30,
+        ])->assertOk()->assertJsonPath('data.trip_load_limit_tons', '30.00');
+
+        $this->actingAs($admin, 'sanctum')->postJson("/api/v1/trips/{$tripId}/assign", [
+            'truck_id' => $truckId,
+            'driver_id' => $driverId,
+            'departure_time' => '10:00',
+            'driver_pay_amount' => 12,
+        ])->assertOk();
+    }
+
     public function test_cancelled_trip_rejects_operation_log_edits(): void
     {
         [$customer, $admin] = $this->makeActors();

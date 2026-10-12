@@ -73,9 +73,9 @@ class TripService
             ]);
         }
 
-        if ((float) $truck->capacity_tons + 0.0001 < (float) $trip->planned_quantity) {
+        if ($truck->tripLoadTons() + 0.0001 < (float) $trip->planned_quantity) {
             throw ValidationException::withMessages([
-                'truck_id' => ['Truck capacity is below the planned trip quantity.'],
+                'truck_id' => ['This truck trip load limit is below the planned trip quantity.'],
             ]);
         }
 

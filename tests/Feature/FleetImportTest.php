@@ -97,6 +97,7 @@ class FleetImportTest extends TestCase
             'type' => 'flatbed',
             'make' => 'Volvo',
             'status' => 'available',
+            'trip_load_limit_tons' => 25,
         ]);
     }
 

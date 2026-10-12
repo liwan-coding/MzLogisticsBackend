@@ -16,6 +16,7 @@ class TruckResource extends JsonResource
             'type' => $this->type,
             'type_label' => app(TruckTypeService::class)->label(is_object($this->type) ? $this->type->value : $this->type),
             'capacity_tons' => $this->capacity_tons,
+            'trip_load_limit_tons' => $this->trip_load_limit_tons,
             'volume_cbm' => $this->volume_cbm,
             'cargo_length_m' => $this->cargo_length_m,
             'cargo_width_m' => $this->cargo_width_m,

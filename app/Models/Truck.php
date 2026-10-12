@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
     'plate_number',
     'type',
     'capacity_tons',
+    'trip_load_limit_tons',
     'volume_cbm',
     'cargo_length_m',
     'cargo_width_m',
@@ -28,11 +29,61 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 ])]
 class Truck extends Model
 {
+    public const DEFAULT_TRIP_LOAD_LIMIT_TONS = 25;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'trip_load_limit_tons' => self::DEFAULT_TRIP_LOAD_LIMIT_TONS,
+    ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Truck $truck): void {
+            $capacity = (float) $truck->capacity_tons;
+            if ($capacity <= 0) {
+                return;
+            }
+
+            $limit = (float) ($truck->trip_load_limit_tons ?? self::DEFAULT_TRIP_LOAD_LIMIT_TONS);
+            if ($limit === (float) self::DEFAULT_TRIP_LOAD_LIMIT_TONS && $capacity < self::DEFAULT_TRIP_LOAD_LIMIT_TONS) {
+                $truck->trip_load_limit_tons = $capacity;
+            }
+        });
+    }
+
+    public static function defaultTripLoadLimit(float $capacityTons): float
+    {
+        if ($capacityTons <= 0) {
+            return (float) self::DEFAULT_TRIP_LOAD_LIMIT_TONS;
+        }
+
+        return min((float) self::DEFAULT_TRIP_LOAD_LIMIT_TONS, $capacityTons);
+    }
+
+    public function tripLoadTons(): float
+    {
+        $capacity = (float) $this->capacity_tons;
+        $limit = (float) ($this->trip_load_limit_tons ?? self::DEFAULT_TRIP_LOAD_LIMIT_TONS);
+
+        if ($capacity <= 0) {
+            return max(0, $limit);
+        }
+
+        if ($limit <= 0) {
+            return $capacity;
+        }
+
+        return min($capacity, $limit);
+    }
+
     protected function casts(): array
     {
         return [
             'status' => TruckStatus::class,
             'capacity_tons' => 'decimal:2',
+            'trip_load_limit_tons' => 'decimal:2',
             'volume_cbm' => 'decimal:2',
             'cargo_length_m' => 'decimal:2',
             'cargo_width_m' => 'decimal:2',
