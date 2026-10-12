@@ -234,6 +234,7 @@ class TripOperationsTest extends TestCase
 
         $shipmentId = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 20,
             'quantity' => 20,
             'pickup_address' => 'Sohar Port',

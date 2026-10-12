@@ -187,6 +187,7 @@ class ShipmentService
 
         return [
             'cargo_type' => $payload['cargo_type'],
+            'truck_type' => $payload['truck_type'],
             'cargo_description' => $payload['cargo_description'] ?? null,
             'weight_tons' => $weight,
             'volume_cbm' => $payload['volume_cbm'] ?? null,

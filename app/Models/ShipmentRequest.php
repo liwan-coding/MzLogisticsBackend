@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'customer_organization_id',
     'created_by',
     'cargo_type',
+    'truck_type',
     'cargo_description',
     'weight_tons',
     'volume_cbm',

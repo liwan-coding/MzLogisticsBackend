@@ -14,6 +14,7 @@ use App\Models\DriverProfile;
 use App\Models\Organization;
 use App\Models\Trip;
 use App\Models\Truck;
+use App\Models\TruckType as TruckTypeCatalog;
 use App\Models\User;
 use Database\Seeders\PaymentMethodSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -39,6 +40,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $response = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Sand',
+            'truck_type' => 'flatbed',
             'weight_tons' => 20,
             'quantity' => 8,
             'quantity_unit' => 'ton',
@@ -52,6 +54,38 @@ class ShipmentWorkflowTest extends TestCase
         $this->assertSame(20.0, (float) $response->json('data.weight_tons'));
         $this->assertSame(20.0, (float) $response->json('data.quantity'));
         $this->assertSame('tons', $response->json('data.quantity_unit'));
+        $this->assertSame('flatbed', $response->json('data.truck_type'));
+        $this->assertSame('Flatbed', $response->json('data.truck_type_label'));
+    }
+
+    public function test_shipment_accepts_a_written_truck_type_when_it_is_not_in_the_catalog(): void
+    {
+        [$customer] = $this->makeCustomerAndProvider();
+        $payload = [
+            'cargo_type' => 'Sand',
+            'weight_tons' => 20,
+            'pickup_city' => 'Sohar',
+            'delivery_city' => 'Nizwa',
+            'required_date' => now()->addDay()->toDateString(),
+        ];
+
+        $this->actingAs($customer, 'sanctum')
+            ->postJson('/api/v1/shipments', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['truck_type']);
+
+        TruckTypeCatalog::query()->where('code', 'reefer')->update(['is_active' => false]);
+
+        $this->actingAs($customer, 'sanctum')
+            ->postJson('/api/v1/shipments', [...$payload, 'truck_type' => 'reefer'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['truck_type']);
+
+        $this->actingAs($customer, 'sanctum')
+            ->postJson('/api/v1/shipments', [...$payload, 'truck_type' => '  قاطرة مع مقطورة  '])
+            ->assertCreated()
+            ->assertJsonPath('data.truck_type', 'قاطرة مع مقطورة')
+            ->assertJsonPath('data.truck_type_label', 'قاطرة مع مقطورة');
     }
 
     public function test_pickup_and_delivery_coordinates_are_persisted(): void
@@ -60,6 +94,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $response = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Steel',
+            'truck_type' => 'flatbed',
             'weight_tons' => 18,
             'pickup_address' => 'Sohar Port',
             'pickup_city' => 'Sohar',
@@ -84,6 +119,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Steel',
+            'truck_type' => 'flatbed',
             'weight_tons' => 18,
             'pickup_address' => 'Sohar Port',
             'pickup_city' => 'Sohar',
@@ -101,6 +137,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $response = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 12.5,
             'pickup_address' => 'Sohar Port',
             'pickup_city' => 'Sohar',
@@ -119,6 +156,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $response = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Packaged food',
+            'truck_type' => 'flatbed',
             'weight_tons' => 16,
             'quantity' => 24,
             'quantity_unit' => 'pallets',
@@ -140,6 +178,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'General cargo',
+            'truck_type' => 'flatbed',
             'weight_tons' => 10,
             'quantity' => 3,
             'quantity_unit' => 'loads',
@@ -157,6 +196,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $shipment = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 20,
             'quantity' => 20,
             'pickup_address' => 'Sohar Port',
@@ -199,6 +239,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $shipment = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 60,
             'quantity' => 60,
             'pickup_address' => 'Sohar Port',
@@ -242,6 +283,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $shipment = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Pipes',
+            'truck_type' => 'flatbed',
             'weight_tons' => 12,
             'quantity' => 12,
             'pickup_address' => 'Muscat',
@@ -286,6 +328,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $shipment = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 12,
             'quantity' => 12,
             'pickup_address' => 'Muscat',
@@ -350,6 +393,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $shipment = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Gravel',
+            'truck_type' => 'flatbed',
             'weight_tons' => 10,
             'quantity' => 10,
             'pickup_address' => 'Sohar',
@@ -422,6 +466,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $shipment = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Tiles',
+            'truck_type' => 'flatbed',
             'weight_tons' => 8,
             'quantity' => 8,
             'pickup_address' => 'Muscat',
@@ -458,6 +503,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $shipment = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 12,
             'quantity' => 12,
             'pickup_address' => 'Muscat',
@@ -517,6 +563,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $shipment = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 12,
             'quantity' => 12,
             'pickup_address' => 'Muscat',
@@ -558,6 +605,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $shipment = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 30,
             'quantity' => 30,
             'pickup_address' => 'Muscat',
@@ -620,6 +668,7 @@ class ShipmentWorkflowTest extends TestCase
 
         $shipment = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 20,
             'quantity' => 20,
             'pickup_address' => 'Sohar Port',

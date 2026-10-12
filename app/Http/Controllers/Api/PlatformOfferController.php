@@ -9,7 +9,7 @@ use App\Http\Resources\PlatformOfferResource;
 use App\Models\PlatformOffer;
 use App\Models\ShipmentRequest;
 use App\Rules\TransportStartDate;
-use App\Rules\UsableTruckType;
+use App\Rules\ShipmentTruckType;
 use App\Services\JobOrchestrationService;
 use App\Services\PlatformOfferService;
 use App\Support\ApiResponse;
@@ -44,7 +44,7 @@ class PlatformOfferController extends Controller
             'price_per_trip' => ['required_without_all:quotation_id,total_price', 'numeric', 'min:0.001'],
             'currency' => ['nullable', 'string', 'size:3'],
             'truck_count' => ['required_without:quotation_id', 'integer', 'min:1'],
-            'truck_type' => ['required_without:quotation_id', 'string', 'max:32', new UsableTruckType($request->user())],
+            'truck_type' => ['required_without:quotation_id', 'string', 'max:120', new ShipmentTruckType($request->user())],
             'truck_capacity_tons' => ['required_without:quotation_id', 'numeric', 'min:0.1'],
             'trip_count' => ['required_without:quotation_id', 'integer', 'min:1'],
             'quantity_per_trip' => ['required_without:quotation_id', 'numeric', 'min:0.1'],

@@ -332,6 +332,7 @@ class ProofOfDeliveryMediaTest extends TestCase
     {
         $shipment = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 12,
             'quantity' => 12,
             'pickup_address' => 'Muscat',

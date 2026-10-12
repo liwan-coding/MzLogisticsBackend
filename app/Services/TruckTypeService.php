@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Quotation;
+use App\Models\ShipmentRequest;
 use App\Models\Truck;
 use App\Models\TruckType;
 use App\Models\User;
@@ -147,7 +148,7 @@ class TruckTypeService
 
         if ($this->isUsed($type->code)) {
             throw ValidationException::withMessages([
-                'truck_type' => ['This truck type is used by existing trucks or quotations and cannot be deleted.'],
+                'truck_type' => ['This truck type is used by existing trucks, quotations, or shipment requests and cannot be deleted.'],
             ]);
         }
 
@@ -172,7 +173,8 @@ class TruckTypeService
     public function isUsed(string $code): bool
     {
         return Truck::query()->where('type', $code)->exists()
-            || Quotation::query()->where('truck_type', $code)->exists();
+            || Quotation::query()->where('truck_type', $code)->exists()
+            || ShipmentRequest::query()->where('truck_type', $code)->exists();
     }
 
     /**

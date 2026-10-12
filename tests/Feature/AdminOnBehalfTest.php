@@ -59,6 +59,7 @@ class AdminOnBehalfTest extends TestCase
         $shipment = $this->actingAs($admin, 'sanctum')->postJson('/api/v1/shipments', [
             'customer_organization_id' => $organizationId,
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 18,
             'pickup_city' => 'Sohar',
             'pickup_address' => 'Sohar Port',
@@ -233,6 +234,7 @@ class AdminOnBehalfTest extends TestCase
         $payload = [
             'customer_organization_id' => $customer->organization_id,
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 18,
             'pickup_city' => 'Sohar',
             'delivery_city' => 'Nizwa',
@@ -246,6 +248,7 @@ class AdminOnBehalfTest extends TestCase
 
         $this->actingAs($admin, 'sanctum')->putJson("/api/v1/shipments/{$draft}", [
             'cargo_type' => 'Steel',
+            'truck_type' => 'flatbed',
             'weight_tons' => 12,
             'pickup_city' => 'Sohar',
             'delivery_city' => 'Nizwa',
@@ -261,6 +264,7 @@ class AdminOnBehalfTest extends TestCase
 
         $this->actingAs($admin, 'sanctum')->putJson("/api/v1/shipments/{$published}", [
             'cargo_type' => 'Steel',
+            'truck_type' => 'flatbed',
             'weight_tons' => 12,
             'pickup_city' => 'Sohar',
             'delivery_city' => 'Nizwa',
@@ -315,6 +319,7 @@ class AdminOnBehalfTest extends TestCase
     {
         return [
             'cargo_type' => 'Sand',
+            'truck_type' => 'flatbed',
             'weight_tons' => 12,
             'pickup_city' => 'Sohar',
             'delivery_city' => 'Nizwa',

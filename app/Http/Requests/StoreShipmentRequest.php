@@ -8,6 +8,7 @@ use App\Enums\OrganizationStatus;
 use App\Enums\OrganizationType;
 use App\Enums\QuantityUnit;
 use App\Models\ShipmentRequest;
+use App\Rules\ShipmentTruckType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -43,6 +44,10 @@ class StoreShipmentRequest extends FormRequest
             $merge['quantity'] = $this->input('weight_tons');
         }
 
+        if ($this->exists('truck_type') && is_string($this->input('truck_type'))) {
+            $merge['truck_type'] = trim($this->input('truck_type'));
+        }
+
         if ($merge !== []) {
             $this->merge($merge);
         }
@@ -52,6 +57,12 @@ class StoreShipmentRequest extends FormRequest
     {
         return [
             'cargo_type' => ['required', 'string', 'max:120'],
+            'truck_type' => [
+                'required',
+                'string',
+                'max:120',
+                new ShipmentTruckType($this->user(), $this->currentTruckType()),
+            ],
             'cargo_description' => ['nullable', 'string', 'max:2000'],
             'weight_tons' => ['required', 'numeric', 'min:0.1'],
             'volume_cbm' => ['nullable', 'numeric', 'min:0'],
@@ -85,5 +96,17 @@ class StoreShipmentRequest extends FormRequest
             'billing_unit' => ['nullable', Rule::enum(BillingUnit::class)],
             'due_days' => ['nullable', 'integer', 'min:0', 'max:'.config('mz.payment_due_days_max', 730)],
         ];
+    }
+
+    private function currentTruckType(): ?string
+    {
+        $shipment = $this->route('shipment');
+        if (! $shipment instanceof ShipmentRequest) {
+            return null;
+        }
+
+        $type = $shipment->truck_type;
+
+        return is_string($type) && $type !== '' ? $type : null;
     }
 }

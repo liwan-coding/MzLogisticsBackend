@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Enums\QuantityUnit;
+use App\Services\TruckTypeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,6 +15,8 @@ class ShipmentResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->reference,
             'cargo_type' => $this->cargo_type,
+            'truck_type' => $this->truck_type,
+            'truck_type_label' => app(TruckTypeService::class)->label($this->truck_type),
             'cargo_description' => $this->cargo_description,
             'weight_tons' => $this->weight_tons,
             'volume_cbm' => $this->volume_cbm,

@@ -316,6 +316,7 @@ class PaymentContractTest extends TestCase
     {
         return [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 20,
             'quantity' => 20,
             'pickup_address' => 'Sohar Port',

@@ -194,6 +194,7 @@ class QuotationOnBehalfTest extends TestCase
 
         $draftId = $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Sand',
+            'truck_type' => 'flatbed',
             'weight_tons' => 10,
             'pickup_city' => 'Sohar',
             'delivery_city' => 'Nizwa',
@@ -253,6 +254,7 @@ class QuotationOnBehalfTest extends TestCase
     {
         return $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
+            'truck_type' => 'flatbed',
             'weight_tons' => 20,
             'quantity' => 20,
             'pickup_address' => 'Sohar Port',
