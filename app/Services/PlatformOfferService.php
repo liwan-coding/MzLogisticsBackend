@@ -82,7 +82,7 @@ class PlatformOfferService
     }
 
     /**
-     * @param  array{total_price?: float|int|string, price_per_trip?: float|int|string, currency?: string|null, truck_count: int, truck_type: string, truck_capacity_tons: float|int|string, trip_count: int, quantity_per_trip: float|int|string, duration_days: int, transport_start_date: string, additional_costs?: float|int|string|null, conditions?: string|null}  $payload
+     * @param  array{total_price?: float|int|string, price_per_trip?: float|int|string, price_per_ton?: float|int|string, currency?: string|null, truck_count: int, truck_type: string, truck_capacity_tons: float|int|string, trip_count: int, quantity_per_trip: float|int|string, duration_days: int, transport_start_date: string, additional_costs?: float|int|string|null, conditions?: string|null}  $payload
      */
     public function publishOwned(User $user, ShipmentRequest $shipment, array $payload): PlatformOffer
     {
@@ -91,7 +91,10 @@ class PlatformOfferService
             $this->replacePublishedOffers($shipment);
 
             $platform = Organization::platform();
-            $pricing = QuotationPricing::resolve($payload);
+            $pricing = QuotationPricing::resolve(
+                $payload,
+                $shipment->weight_tons !== null ? (float) $shipment->weight_tons : null,
+            );
             $customerPrice = $pricing['total_price'];
             $existing = Quotation::query()
                 ->where('shipment_request_id', $shipment->id)
@@ -108,7 +111,10 @@ class PlatformOfferService
                     'reference' => $existing?->reference ?? ReferenceGenerator::next('QTN', Quotation::class),
                     'created_by' => $user->id,
                     'total_price' => $customerPrice,
+                    'transport_price' => $pricing['transport_price'],
                     'price_per_trip' => $pricing['price_per_trip'],
+                    'price_per_ton' => $pricing['price_per_ton'],
+                    'pricing_basis' => $pricing['pricing_basis'],
                     'currency' => $payload['currency'] ?? config('mz.currency'),
                     'truck_count' => $payload['truck_count'],
                     'truck_type' => $payload['truck_type'],
@@ -117,7 +123,7 @@ class PlatformOfferService
                     'quantity_per_trip' => $payload['quantity_per_trip'],
                     'duration_days' => $payload['duration_days'],
                     'transport_start_date' => $payload['transport_start_date'],
-                    'additional_costs' => $payload['additional_costs'] ?? 0,
+                    'additional_costs' => $pricing['additional_costs'],
                     'conditions' => $payload['conditions'] ?? null,
                     'valid_until' => now()->addDays((int) config('mz.quotation_validity_days')),
                     'status' => QuotationStatus::Submitted,

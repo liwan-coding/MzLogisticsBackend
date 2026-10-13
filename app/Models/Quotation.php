@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\OrganizationType;
+use App\Enums\PricingBasis;
 use App\Enums\QuotationStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,7 +18,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'created_by',
     'submitted_on_behalf',
     'total_price',
+    'transport_price',
     'price_per_trip',
+    'price_per_ton',
+    'pricing_basis',
     'currency',
     'truck_count',
     'truck_type',
@@ -39,7 +43,10 @@ class Quotation extends Model
             'status' => QuotationStatus::class,
             'submitted_on_behalf' => 'boolean',
             'total_price' => 'decimal:3',
+            'transport_price' => 'decimal:3',
             'price_per_trip' => 'decimal:3',
+            'price_per_ton' => 'decimal:3',
+            'pricing_basis' => PricingBasis::class,
             'truck_capacity_tons' => 'decimal:2',
             'quantity_per_trip' => 'decimal:2',
             'transport_start_date' => 'date',

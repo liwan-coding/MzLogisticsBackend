@@ -56,7 +56,7 @@ class QuotationService
                 'shipment_request_id' => $shipment->id,
                 'provider_organization_id' => $user->organization_id,
             ],
-            $this->quotationValues($user, $payload, $existing, false),
+            $this->quotationValues($user, $shipment, $payload, $existing, false),
         );
 
         AuditLogger::record('quotation.submitted', $quotation, [], $quotation->toArray(), $user);
@@ -98,7 +98,7 @@ class QuotationService
                 'shipment_request_id' => $shipment->id,
                 'provider_organization_id' => $organization->id,
             ],
-            $this->quotationValues($admin, $payload, $existing, true),
+            $this->quotationValues($admin, $shipment, $payload, $existing, true),
         );
 
         AuditLogger::record('quotation.submitted_on_behalf', $quotation, [], $quotation->toArray(), $admin);
@@ -168,16 +168,19 @@ class QuotationService
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    private function quotationValues(User $actor, array $payload, ?Quotation $existing, bool $onBehalf): array
+    private function quotationValues(User $actor, ShipmentRequest $shipment, array $payload, ?Quotation $existing, bool $onBehalf): array
     {
-        $pricing = QuotationPricing::resolve($payload);
+        $pricing = QuotationPricing::resolve($payload, self::weightTons($shipment));
 
         return [
             'reference' => $existing?->reference ?? ReferenceGenerator::next('QTN', Quotation::class),
             'created_by' => $actor->id,
             'submitted_on_behalf' => $onBehalf,
             'total_price' => $pricing['total_price'],
+            'transport_price' => $pricing['transport_price'],
             'price_per_trip' => $pricing['price_per_trip'],
+            'price_per_ton' => $pricing['price_per_ton'],
+            'pricing_basis' => $pricing['pricing_basis'],
             'currency' => $payload['currency'] ?? config('mz.currency'),
             'truck_count' => $payload['truck_count'],
             'truck_type' => $payload['truck_type'],
@@ -186,10 +189,15 @@ class QuotationService
             'quantity_per_trip' => $payload['quantity_per_trip'],
             'duration_days' => $payload['duration_days'],
             'transport_start_date' => $payload['transport_start_date'],
-            'additional_costs' => $payload['additional_costs'] ?? 0,
+            'additional_costs' => $pricing['additional_costs'],
             'conditions' => $payload['conditions'] ?? null,
             'valid_until' => now()->addDays((int) config('mz.quotation_validity_days')),
             'status' => QuotationStatus::Submitted,
         ];
+    }
+
+    private static function weightTons(ShipmentRequest $shipment): ?float
+    {
+        return $shipment->weight_tons !== null ? (float) $shipment->weight_tons : null;
     }
 }

@@ -8,6 +8,7 @@ use App\Enums\OrganizationType;
 use App\Enums\TruckType;
 use App\Enums\UserType;
 use App\Models\Organization;
+use App\Models\ShipmentRequest;
 use App\Models\User;
 use App\Support\StaffRoles;
 use Database\Seeders\PaymentMethodSeeder;
@@ -77,6 +78,113 @@ class QuotationOnBehalfTest extends TestCase
         $this->assertSame(25.0, (float) $created->json('data.price_per_trip'));
         $this->assertSame(100.0, (float) $created->json('data.total_price'));
         $this->assertSame(4, (int) $created->json('data.trip_count'));
+        $this->assertSame('trip', $created->json('data.pricing_basis'));
+        $this->assertNull($created->json('data.price_per_ton'));
+    }
+
+    public function test_price_per_ton_uses_the_shipment_weight(): void
+    {
+        $admin = $this->makePlatformUser(StaffRoles::SUPER_ADMIN);
+        $customer = $this->makeCustomer();
+        $provider = $this->makeProvider('Ton Rate Haul');
+        $shipmentId = $this->publishShipment($customer, 40);
+        $payload = $this->quotePayload($provider->organization_id);
+        unset($payload['total_price']);
+        $payload['price_per_ton'] = 2.5;
+        $payload['truck_count'] = 4;
+        $payload['trip_count'] = 2;
+
+        $created = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/v1/shipments/{$shipmentId}/quotations/on-behalf", $payload)
+            ->assertCreated();
+
+        $this->assertSame(2.5, (float) $created->json('data.price_per_ton'));
+        $this->assertNull($created->json('data.price_per_trip'));
+        $this->assertSame('ton', $created->json('data.pricing_basis'));
+        $this->assertSame(100.0, (float) $created->json('data.total_price'));
+        $this->assertSame(4, (int) $created->json('data.trip_count'));
+    }
+
+    public function test_additional_costs_are_added_to_the_amount_due(): void
+    {
+        $admin = $this->makePlatformUser(StaffRoles::SUPER_ADMIN);
+        $customer = $this->makeCustomer();
+        $provider = $this->makeProvider('Extra Cost Haul');
+        $shipmentId = $this->publishShipment($customer, 40);
+
+        $flat = $this->quotePayload($provider->organization_id, 90);
+        $flat['additional_costs'] = 10;
+        $created = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/v1/shipments/{$shipmentId}/quotations/on-behalf", $flat)
+            ->assertCreated();
+        $this->assertSame(90.0, (float) $created->json('data.transport_price'));
+        $this->assertSame(10.0, (float) $created->json('data.additional_costs'));
+        $this->assertSame(100.0, (float) $created->json('data.total_price'));
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/quotations/'.$created->json('data.id').'/withdraw')
+            ->assertOk();
+
+        $perTrip = $this->quotePayload($provider->organization_id);
+        unset($perTrip['total_price']);
+        $perTrip['price_per_trip'] = 25;
+        $perTrip['truck_count'] = 4;
+        $perTrip['trip_count'] = 2;
+        $perTrip['additional_costs'] = 10;
+        $created = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/v1/shipments/{$shipmentId}/quotations/on-behalf", $perTrip)
+            ->assertCreated();
+        $this->assertSame(100.0, (float) $created->json('data.transport_price'));
+        $this->assertSame(110.0, (float) $created->json('data.total_price'));
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/quotations/'.$created->json('data.id').'/withdraw')
+            ->assertOk();
+
+        $perTon = $this->quotePayload($provider->organization_id);
+        unset($perTon['total_price']);
+        $perTon['price_per_ton'] = 2.5;
+        $perTon['additional_costs'] = 5;
+        $created = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/v1/shipments/{$shipmentId}/quotations/on-behalf", $perTon)
+            ->assertCreated();
+        $this->assertSame(100.0, (float) $created->json('data.transport_price'));
+        $this->assertSame(5.0, (float) $created->json('data.additional_costs'));
+        $this->assertSame(105.0, (float) $created->json('data.total_price'));
+    }
+
+    public function test_price_per_ton_is_rejected_when_the_shipment_has_no_weight(): void
+    {
+        $admin = $this->makePlatformUser(StaffRoles::SUPER_ADMIN);
+        $customer = $this->makeCustomer();
+        $provider = $this->makeProvider('Empty Weight Haul');
+        $shipmentId = $this->publishShipment($customer, 40);
+        ShipmentRequest::query()->whereKey($shipmentId)->update(['weight_tons' => 0]);
+        $payload = $this->quotePayload($provider->organization_id);
+        unset($payload['total_price']);
+        $payload['price_per_ton'] = 2.5;
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/v1/shipments/{$shipmentId}/quotations/on-behalf", $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['price_per_ton']);
+    }
+
+    public function test_trip_and_ton_prices_cannot_be_sent_together(): void
+    {
+        $admin = $this->makePlatformUser(StaffRoles::SUPER_ADMIN);
+        $customer = $this->makeCustomer();
+        $provider = $this->makeProvider('Mixed Rate Haul');
+        $shipmentId = $this->publishShipment($customer, 40);
+        $payload = $this->quotePayload($provider->organization_id);
+        unset($payload['total_price']);
+        $payload['price_per_trip'] = 25;
+        $payload['price_per_ton'] = 2.5;
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/v1/shipments/{$shipmentId}/quotations/on-behalf", $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['price_per_trip', 'price_per_ton']);
     }
 
     public function test_operations_manager_can_submit_and_the_quote_can_become_the_customer_offer(): void
@@ -250,13 +358,13 @@ class QuotationOnBehalfTest extends TestCase
         return $provider;
     }
 
-    private function publishShipment(User $customer): int
+    private function publishShipment(User $customer, float $weightTons = 20): int
     {
         return $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
             'cargo_type' => 'Cement',
             'truck_type' => 'flatbed',
-            'weight_tons' => 20,
-            'quantity' => 20,
+            'weight_tons' => $weightTons,
+            'quantity' => $weightTons,
             'pickup_address' => 'Sohar Port',
             'pickup_city' => 'Sohar',
             'delivery_address' => 'Nizwa',

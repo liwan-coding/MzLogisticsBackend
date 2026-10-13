@@ -3,8 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Models\ShipmentRequest;
-use App\Rules\TransportStartDate;
 use App\Rules\ShipmentTruckType;
+use App\Rules\TransportStartDate;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreQuotationRequest extends FormRequest
@@ -17,8 +17,9 @@ class StoreQuotationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'total_price' => ['required_without:price_per_trip', 'numeric', 'min:0.001'],
-            'price_per_trip' => ['required_without:total_price', 'numeric', 'min:0.001'],
+            'total_price' => ['required_without_all:price_per_trip,price_per_ton', 'numeric', 'min:0.001'],
+            'price_per_trip' => ['required_without_all:total_price,price_per_ton', 'numeric', 'min:0.001', 'prohibits:price_per_ton'],
+            'price_per_ton' => ['required_without_all:total_price,price_per_trip', 'numeric', 'min:0.001', 'prohibits:price_per_trip'],
             'currency' => ['nullable', 'string', 'size:3'],
             'truck_count' => ['required', 'integer', 'min:1'],
             'truck_type' => ['required', 'string', 'max:120', new ShipmentTruckType($this->user())],

@@ -8,8 +8,8 @@ use App\Http\Resources\PaymentResource;
 use App\Http\Resources\PlatformOfferResource;
 use App\Models\PlatformOffer;
 use App\Models\ShipmentRequest;
-use App\Rules\TransportStartDate;
 use App\Rules\ShipmentTruckType;
+use App\Rules\TransportStartDate;
 use App\Services\JobOrchestrationService;
 use App\Services\PlatformOfferService;
 use App\Support\ApiResponse;
@@ -31,17 +31,18 @@ class PlatformOfferController extends Controller
         $this->authorize('create', PlatformOffer::class);
         $this->authorize('view', $shipment);
 
-        if ($request->filled('quotation_id') && ($request->filled('total_price') || $request->filled('price_per_trip'))) {
+        if ($request->filled('quotation_id') && ($request->filled('total_price') || $request->filled('price_per_trip') || $request->filled('price_per_ton'))) {
             throw ValidationException::withMessages([
                 'quotation_id' => ['Choose either a provider quotation or a platform offer.'],
             ]);
         }
 
         $data = $request->validate([
-            'quotation_id' => ['required_without_all:total_price,price_per_trip', 'integer'],
+            'quotation_id' => ['required_without_all:total_price,price_per_trip,price_per_ton', 'integer'],
             'customer_price' => ['required_with:quotation_id', 'numeric', 'min:0.001'],
-            'total_price' => ['required_without_all:quotation_id,price_per_trip', 'numeric', 'min:0.001'],
-            'price_per_trip' => ['required_without_all:quotation_id,total_price', 'numeric', 'min:0.001'],
+            'total_price' => ['required_without_all:quotation_id,price_per_trip,price_per_ton', 'numeric', 'min:0.001'],
+            'price_per_trip' => ['required_without_all:quotation_id,total_price,price_per_ton', 'numeric', 'min:0.001', 'prohibits:price_per_ton'],
+            'price_per_ton' => ['required_without_all:quotation_id,total_price,price_per_trip', 'numeric', 'min:0.001', 'prohibits:price_per_trip'],
             'currency' => ['nullable', 'string', 'size:3'],
             'truck_count' => ['required_without:quotation_id', 'integer', 'min:1'],
             'truck_type' => ['required_without:quotation_id', 'string', 'max:120', new ShipmentTruckType($request->user())],
