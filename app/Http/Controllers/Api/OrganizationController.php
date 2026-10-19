@@ -10,6 +10,7 @@ use App\Http\Requests\StoreProviderRequest;
 use App\Http\Resources\OrganizationResource;
 use App\Models\Organization;
 use App\Services\AuthService;
+use App\Services\DomainNotifier;
 use App\Services\PaymentContractService;
 use App\Support\ApiResponse;
 use App\Support\AuditLogger;
@@ -25,6 +26,7 @@ class OrganizationController extends Controller
     public function __construct(
         private readonly PaymentContractService $paymentContracts,
         private readonly AuthService $auth,
+        private readonly DomainNotifier $notifier,
     ) {}
 
     public function customers(Request $request): JsonResponse
@@ -151,6 +153,7 @@ class OrganizationController extends Controller
 
         $organization->fill($data)->save();
         AuditLogger::record('provider.verified', $organization, [], $data, $request->user());
+        $this->notifier->organizationStatusChanged($organization->fresh(), $request->user());
 
         return ApiResponse::success(OrganizationResource::make($organization), 'Organization status updated.');
     }

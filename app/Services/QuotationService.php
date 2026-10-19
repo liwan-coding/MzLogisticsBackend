@@ -20,7 +20,10 @@ use Illuminate\Validation\ValidationException;
 
 class QuotationService
 {
-    public function __construct(private readonly PlatformOfferService $platformOffers) {}
+    public function __construct(
+        private readonly PlatformOfferService $platformOffers,
+        private readonly DomainNotifier $notifier,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $payload
@@ -60,6 +63,7 @@ class QuotationService
         );
 
         AuditLogger::record('quotation.submitted', $quotation, [], $quotation->toArray(), $user);
+        $this->notifier->quotationSubmitted($quotation, $user);
 
         return $quotation->fresh(['providerOrganization', 'shipmentRequest']);
     }
@@ -102,6 +106,7 @@ class QuotationService
         );
 
         AuditLogger::record('quotation.submitted_on_behalf', $quotation, [], $quotation->toArray(), $admin);
+        $this->notifier->quotationSubmitted($quotation, $admin, onBehalf: true);
 
         return $quotation->fresh(['providerOrganization', 'shipmentRequest']);
     }
@@ -117,6 +122,7 @@ class QuotationService
         $quotation->forceFill(['status' => QuotationStatus::Withdrawn])->save();
         $this->platformOffers->withdrawForQuotation($quotation, $user);
         AuditLogger::record('quotation.withdrawn', $quotation, [], ['status' => $quotation->status->value], $user);
+        $this->notifier->quotationWithdrawn($quotation, $user);
 
         return $quotation->fresh();
     }

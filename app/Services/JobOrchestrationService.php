@@ -37,6 +37,7 @@ class JobOrchestrationService
         private readonly PaymentGateway $paymentGateway,
         private readonly PaymentMethodService $paymentMethods,
         private readonly WalletLedgerService $walletLedger,
+        private readonly DomainNotifier $notifier,
     ) {}
 
     public function acceptPlatformOffer(User $user, PlatformOffer $offer, ?string $method = null, ?string $callbackBaseUrl = null): QuotationAcceptanceResult
@@ -353,15 +354,24 @@ class JobOrchestrationService
             return;
         }
 
-        Invoice::query()
+        $invoices = Invoice::query()
             ->where('transport_job_id', $job->id)
             ->where('type', InvoiceType::Customer)
             ->where('status', InvoiceStatus::Issued)
             ->whereNull('trip_id')
             ->whereNull('due_at')
-            ->update([
-                'due_at' => now()->addDays($terms->dueDays),
-            ]);
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return;
+        }
+
+        $dueAt = now()->addDays($terms->dueDays);
+        Invoice::query()->whereIn('id', $invoices->modelKeys())->update(['due_at' => $dueAt]);
+
+        foreach ($invoices as $invoice) {
+            $this->notifier->invoiceDue($invoice);
+        }
     }
 
     public function openDeliveredTripInvoice(Trip $trip): void
@@ -378,15 +388,25 @@ class JobOrchestrationService
             return;
         }
 
-        Invoice::query()
+        $invoices = Invoice::query()
             ->where('transport_job_id', $job->id)
             ->where('trip_id', $trip->id)
             ->where('type', InvoiceType::Customer)
             ->where('status', InvoiceStatus::Issued)
             ->whereNull('due_at')
-            ->update([
-                'due_at' => now()->addDays($terms->dueDays),
-            ]);
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return;
+        }
+
+        Invoice::query()->whereIn('id', $invoices->modelKeys())->update([
+            'due_at' => now()->addDays($terms->dueDays),
+        ]);
+
+        foreach ($invoices as $invoice) {
+            $this->notifier->invoiceDue($invoice);
+        }
     }
 
     /**
@@ -414,6 +434,7 @@ class JobOrchestrationService
             AuditLogger::record('payment.receipt_uploaded', $payment, [], [
                 'has_receipt' => true,
             ], $user);
+            $this->notifier->receiptUploaded($payment, $user);
 
             return $payment->fresh();
         });
@@ -596,6 +617,10 @@ class JobOrchestrationService
         );
 
         $quotation->forceFill(['status' => QuotationStatus::Accepted])->save();
+        $losingOrganizationIds = $shipment->quotations()
+            ->where('id', '!=', $quotation->id)
+            ->where('status', QuotationStatus::Submitted)
+            ->pluck('provider_organization_id');
         $shipment->quotations()
             ->where('id', '!=', $quotation->id)
             ->where('status', QuotationStatus::Submitted)
@@ -618,6 +643,8 @@ class JobOrchestrationService
         if ($payment && $paid) {
             AuditLogger::record('payment.processed', $payment, [], ['status' => PaymentStatus::Completed->value], $user);
         }
+
+        $this->notifier->jobAwarded($job, $shipment, $user, $losingOrganizationIds);
 
         return $job->fresh(['trips', 'shipmentRequest', 'quotation', 'customerOrganization', 'providerOrganization', 'invoices']);
     }

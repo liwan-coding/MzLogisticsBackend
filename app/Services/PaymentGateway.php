@@ -10,6 +10,8 @@ use RuntimeException;
 
 class PaymentGateway
 {
+    public function __construct(private readonly DomainNotifier $notifier) {}
+
     public function usesHostedCheckout(): bool
     {
         return ! config('mz.sandbox_payments') && $this->thawani()->isConfigured();
@@ -87,6 +89,8 @@ class PaymentGateway
             return $payment;
         }
 
+        $alreadyFailed = $payment->status === PaymentStatus::Failed;
+
         $payment->forceFill([
             'status' => PaymentStatus::Failed,
             'gateway_payload' => array_merge($payment->gateway_payload ?? [], $payload, [
@@ -94,7 +98,12 @@ class PaymentGateway
             ]),
         ])->save();
 
-        return $payment->fresh();
+        $payment = $payment->fresh();
+        if (! $alreadyFailed) {
+            $this->notifier->paymentFailed($payment);
+        }
+
+        return $payment;
     }
 
     public function paymentLink(Payment $payment): ?string

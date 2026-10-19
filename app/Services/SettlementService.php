@@ -16,7 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class SettlementService
 {
-    public function __construct(private readonly WalletLedgerService $ledger) {}
+    public function __construct(
+        private readonly WalletLedgerService $ledger,
+        private readonly DomainNotifier $notifier,
+    ) {}
 
     /**
      * @param  array{amount: float|int|string, period_start?: string, period_end?: string}  $data
@@ -101,7 +104,12 @@ class SettlementService
                 $user,
             );
 
-            return $settlement->fresh(['providerOrganization', 'requester:id,name']);
+            $fresh = $settlement->fresh(['providerOrganization', 'requester:id,name']);
+            if ($source === SettlementSource::Provider) {
+                $this->notifier->settlementRequested($fresh, $user);
+            }
+
+            return $fresh;
         });
     }
 
@@ -124,8 +132,10 @@ class SettlementService
             ])->save();
 
             AuditLogger::record('settlement.completed', $settlement, [], ['status' => $settlement->status->value], $user);
+            $fresh = $settlement->fresh(['providerOrganization', 'requester:id,name']);
+            $this->notifier->settlementCompleted($fresh, $user);
 
-            return $settlement->fresh(['providerOrganization', 'requester:id,name']);
+            return $fresh;
         });
     }
 }

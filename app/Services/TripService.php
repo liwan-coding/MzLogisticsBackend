@@ -32,6 +32,7 @@ class TripService
         private readonly WalletLedgerService $walletLedger,
         private readonly JobOrchestrationService $jobs,
         private readonly DriverPayableService $driverPayables,
+        private readonly DomainNotifier $notifier,
     ) {}
 
     /**
@@ -109,8 +110,9 @@ class TripService
             isset($payload['departure_date']) ? (string) $payload['departure_date'] : null,
         );
         $driverPay = $user->isPlatform() ? $this->resolveDriverPay($profile, $payload) : null;
+        $previousDriverId = $trip->driver_user_id;
 
-        return DB::transaction(function () use ($user, $trip, $truck, $driver, $profile, $departure, $driverPay) {
+        return DB::transaction(function () use ($user, $trip, $truck, $driver, $profile, $departure, $driverPay, $previousDriverId) {
             $trip->forceFill([
                 'truck_id' => $truck->id,
                 'driver_user_id' => $driver->id,
@@ -143,6 +145,11 @@ class TripService
                 'driver_pay_amount' => $driverPay,
                 'scheduled_departure_at' => $departure->toIso8601String(),
             ], $user);
+
+            $previousDriver = $previousDriverId && (int) $previousDriverId !== (int) $driver->id
+                ? User::query()->find($previousDriverId)
+                : null;
+            $this->notifier->tripAssigned($trip->fresh(['transportJob', 'driver']), $driver, $previousDriver, $user);
 
             return $trip->fresh(['truck', 'driver.driverProfile', 'transportJob']);
         });
@@ -203,6 +210,11 @@ class TripService
 
         if ($next === TripStatus::Completed) {
             $this->completeTripEffects($trip);
+            $this->notifier->tripCompleted($trip->fresh(), $user);
+        } elseif ($next === TripStatus::InTransit) {
+            $this->notifier->tripInTransit($trip, $user);
+        } elseif ($next === TripStatus::Cancelled) {
+            $this->notifier->tripCancelled($trip->fresh(['transportJob', 'driver']), $user);
         }
 
         return $trip->fresh(['truck', 'driver', 'proofOfDelivery', 'transportJob']);
@@ -415,7 +427,19 @@ class TripService
         }
 
         if (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+            $requested = is_array($filters['status'])
+                ? $filters['status']
+                : explode(',', (string) $filters['status']);
+            $allowed = array_map(fn (TripStatus $status) => $status->value, TripStatus::cases());
+            $statuses = array_values(array_intersect(
+                array_filter(array_map(fn ($status) => trim((string) $status), $requested)),
+                $allowed,
+            ));
+            if (count($statuses) === 1) {
+                $query->where('status', $statuses[0]);
+            } elseif ($statuses !== []) {
+                $query->whereIn('status', $statuses);
+            }
         }
 
         if (! empty($filters['search'])) {
@@ -458,6 +482,7 @@ class TripService
             $this->walletLedger->releaseCompletedJob($job->fresh());
             $this->jobs->openDeferredInvoices($job->fresh());
             AuditLogger::record('job.completed', $job);
+            $this->notifier->jobCompleted($job->fresh());
         }
 
         if ($trip->truck && ! Trip::query()->where('truck_id', $trip->truck_id)->whereNotIn('status', [TripStatus::Completed, TripStatus::Cancelled])->exists()) {

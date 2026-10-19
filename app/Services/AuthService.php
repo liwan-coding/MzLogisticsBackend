@@ -20,7 +20,10 @@ use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
-    public function __construct(private readonly PaymentContractService $paymentContracts) {}
+    public function __construct(
+        private readonly PaymentContractService $paymentContracts,
+        private readonly DomainNotifier $notifier,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $payload
@@ -118,6 +121,10 @@ class AuthService
             ]);
 
             $user->assignRole('Provider Admin');
+
+            if ($status === OrganizationStatus::Pending) {
+                $this->notifier->providerRegistered($organization);
+            }
 
             return $user->load('organization');
         });

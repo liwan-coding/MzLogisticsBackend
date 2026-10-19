@@ -42,4 +42,9 @@ return [
         'bias_radius_meters' => (int) env('GOOGLE_MAPS_BIAS_RADIUS', 400000),
     ],
 
+    'firebase' => [
+        'project_id' => env('FIREBASE_PROJECT_ID', 'movex-c49cb'),
+        'credentials' => env('FIREBASE_CREDENTIALS') ?: storage_path('app/private/firebase/movex-firebase-service-account.json.json'),
+    ],
+
 ];

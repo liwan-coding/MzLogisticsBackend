@@ -68,6 +68,11 @@ class User extends Authenticatable
         return $this->hasMany(DriverActivationToken::class);
     }
 
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
     public function usesTechnicalEmail(): bool
     {
         $domain = (string) config('mz.driver_activation.technical_email_domain', 'drivers.mz.local');

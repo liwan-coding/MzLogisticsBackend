@@ -19,6 +19,8 @@ use Illuminate\Validation\ValidationException;
 
 class PlatformOfferService
 {
+    public function __construct(private readonly DomainNotifier $notifier) {}
+
     public function publish(User $user, ShipmentRequest $shipment, int $quotationId, float $customerPrice): PlatformOffer
     {
         return DB::transaction(function () use ($user, $shipment, $quotationId, $customerPrice) {
@@ -76,8 +78,10 @@ class PlatformOfferService
             ]);
 
             AuditLogger::record('platform_offer.published', $offer, [], $offer->toArray(), $user);
+            $fresh = $offer->fresh(['quotation.providerOrganization', 'shipmentRequest']);
+            $this->notifier->platformOfferPublished($fresh, $user);
 
-            return $offer->fresh(['quotation.providerOrganization', 'shipmentRequest']);
+            return $fresh;
         });
     }
 
@@ -152,8 +156,10 @@ class PlatformOfferService
             ]);
 
             AuditLogger::record('platform_offer.published', $offer, [], $offer->toArray(), $user);
+            $fresh = $offer->fresh(['quotation.providerOrganization', 'shipmentRequest']);
+            $this->notifier->platformOfferPublished($fresh, $user);
 
-            return $offer->fresh(['quotation.providerOrganization', 'shipmentRequest']);
+            return $fresh;
         });
     }
 
@@ -169,6 +175,7 @@ class PlatformOfferService
         $offer->forceFill(['status' => PlatformOfferStatus::Withdrawn])->save();
         $this->withdrawPlatformQuotation($offer->quotation, $user);
         AuditLogger::record('platform_offer.withdrawn', $offer, [], ['status' => $offer->status->value], $user);
+        $this->notifier->platformOfferWithdrawn($offer->fresh(['quotation.providerOrganization', 'shipmentRequest']), $user);
 
         return $offer->fresh();
     }
@@ -183,6 +190,7 @@ class PlatformOfferService
         foreach ($offers as $offer) {
             $offer->forceFill(['status' => PlatformOfferStatus::Withdrawn])->save();
             AuditLogger::record('platform_offer.withdrawn', $offer, [], ['reason' => 'quotation.withdrawn'], $user);
+            $this->notifier->platformOfferWithdrawn($offer->fresh(['quotation.providerOrganization', 'shipmentRequest']), $user);
         }
     }
 
@@ -217,6 +225,7 @@ class PlatformOfferService
         foreach ($offers as $offer) {
             $offer->forceFill(['status' => PlatformOfferStatus::Withdrawn])->save();
             $this->withdrawPlatformQuotation($offer->quotation);
+            $this->notifier->platformOfferWithdrawn($offer->fresh(['quotation.providerOrganization', 'shipmentRequest']));
         }
     }
 

@@ -20,6 +20,7 @@ class ShipmentService
     public function __construct(
         private readonly PaymentContractService $paymentContracts,
         private readonly PlatformSettingService $settings,
+        private readonly DomainNotifier $notifier,
     ) {}
 
     /**
@@ -42,6 +43,10 @@ class ShipmentService
         $this->paymentContracts->snapshotOnto($shipment, $payload);
 
         AuditLogger::record('shipment.created', $shipment, [], $shipment->toArray(), $user);
+
+        if ($status === ShipmentStatus::Published) {
+            $this->notifier->shipmentPublished($shipment, $user);
+        }
 
         return $shipment->fresh();
     }
@@ -83,6 +88,7 @@ class ShipmentService
         $this->paymentContracts->snapshotOnto($shipment);
 
         AuditLogger::record('shipment.published', $shipment, [], ['status' => $shipment->status->value], $user);
+        $this->notifier->shipmentPublished($shipment, $user);
 
         return $shipment->fresh();
     }
@@ -97,6 +103,7 @@ class ShipmentService
 
         $shipment->forceFill(['status' => ShipmentStatus::Cancelled])->save();
         AuditLogger::record('shipment.cancelled', $shipment, [], ['status' => $shipment->status->value], $user);
+        $this->notifier->shipmentCancelled($shipment, $user);
 
         return $shipment->fresh();
     }
