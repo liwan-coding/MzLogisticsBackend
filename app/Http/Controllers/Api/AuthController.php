@@ -8,16 +8,18 @@ use App\Http\Requests\Auth\RegisterCustomerRequest;
 use App\Http\Requests\Auth\RegisterProviderRequest;
 use App\Http\Resources\UserResource;
 use App\Services\AuthService;
+use App\Services\PasswordResetService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rules\Password as PasswordRule;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly AuthService $authService) {}
+    public function __construct(
+        private readonly AuthService $authService,
+        private readonly PasswordResetService $passwordResets,
+    ) {}
 
     public function registerCustomer(RegisterCustomerRequest $request): JsonResponse
     {
@@ -106,29 +108,32 @@ class AuthController extends Controller
 
     public function forgotPassword(Request $request): JsonResponse
     {
+        $this->useRequestLocale($request);
         $request->validate(['email' => ['required', 'email']]);
-        $status = $this->authService->sendResetLink($request->string('email')->toString());
+        $this->passwordResets->requestCode($request->string('email')->toString());
 
-        if ($status !== Password::RESET_LINK_SENT) {
-            throw ValidationException::withMessages(['email' => [__($status)]]);
-        }
-
-        return ApiResponse::success(null, __($status));
+        return ApiResponse::success(null, __('mail.password_reset.sent'));
     }
 
     public function resetPassword(Request $request): JsonResponse
     {
+        $this->useRequestLocale($request);
         $data = $request->validate([
-            'token' => ['required', 'string'],
             'email' => ['required', 'email'],
+            'code' => ['required', 'string', 'max:16'],
             'password' => ['required', 'confirmed', PasswordRule::min(8)],
         ]);
 
-        $status = $this->authService->resetPassword($data);
-        if ($status !== Password::PASSWORD_RESET) {
-            throw ValidationException::withMessages(['email' => [__($status)]]);
-        }
+        $this->passwordResets->reset($data['email'], $data['code'], $data['password']);
 
-        return ApiResponse::success(null, __($status));
+        return ApiResponse::success(null, __('mail.password_reset.updated'));
+    }
+
+    private function useRequestLocale(Request $request): void
+    {
+        $locale = $request->getPreferredLanguage(['ar', 'en']);
+        if (is_string($locale)) {
+            app()->setLocale($locale);
+        }
     }
 }

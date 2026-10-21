@@ -39,8 +39,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/register/provider', [AuthController::class, 'registerProvider']);
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/driver/activate', [AuthController::class, 'activateDriver'])->middleware('throttle:10,1');
-        Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
-        Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+        Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
+        Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:10,1');
     });
 
     Route::middleware(['auth:sanctum', 'active'])->group(function (): void {

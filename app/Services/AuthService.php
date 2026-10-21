@@ -14,7 +14,6 @@ use App\Support\ReferenceGenerator;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -271,26 +270,6 @@ class AuthService
     public function logout(User $user): void
     {
         $user->currentAccessToken()?->delete();
-    }
-
-    public function sendResetLink(string $email): string
-    {
-        return Password::sendResetLink(['email' => $email]);
-    }
-
-    public function resetPassword(array $payload): string
-    {
-        return Password::reset(
-            $payload,
-            function (User $user, string $password): void {
-                $user->forceFill([
-                    'password' => $password,
-                    'remember_token' => Str::random(60),
-                ])->save();
-
-                event(new PasswordReset($user));
-            }
-        );
     }
 
     /**

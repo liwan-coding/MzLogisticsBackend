@@ -13,6 +13,10 @@ return [
     'default_locale' => env('MZ_DEFAULT_LOCALE', 'ar'),
     'business_timezone' => env('MZ_BUSINESS_TIMEZONE', 'Asia/Muscat'),
     'payment_due_days_max' => (int) env('MZ_PAYMENT_DUE_DAYS_MAX', 730),
+    'password_reset' => [
+        'expires_minutes' => (int) env('PASSWORD_RESET_EXPIRES_MINUTES', 15),
+        'max_attempts' => (int) env('PASSWORD_RESET_MAX_ATTEMPTS', 5),
+    ],
     'driver_activation' => [
         'expires_days' => (int) env('DRIVER_ACTIVATION_EXPIRES_DAYS', 7),
         'max_attempts' => (int) env('DRIVER_ACTIVATION_MAX_ATTEMPTS', 5),
