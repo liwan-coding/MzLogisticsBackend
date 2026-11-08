@@ -117,11 +117,25 @@ class DocumentController extends Controller
         }
 
         if ($owner instanceof User) {
-            abort_unless($owner->isDriver(), 404);
-            $this->authorizePermission($request, Permissions::DRIVERS_VIEW);
-            $this->assertSameOrganization($request, (int) $owner->organization_id);
+            if ($owner->isDriver()) {
+                $this->authorizePermission($request, Permissions::DRIVERS_VIEW);
+                $this->assertSameOrganization($request, (int) $owner->organization_id);
 
-            return;
+                return;
+            }
+
+            if ($owner->isCustomer()) {
+                $viewer = $request->user();
+                abort_unless(
+                    $viewer->id === $owner->id
+                    || ($viewer->isPlatform() && $viewer->can(Permissions::CUSTOMERS_VIEW)),
+                    403,
+                );
+
+                return;
+            }
+
+            abort(404);
         }
 
         if ($owner instanceof Organization) {

@@ -111,7 +111,13 @@ class OrganizationController extends Controller
         if ($organization->isCustomer()) {
             $this->paymentContracts->ensureForCustomer($organization);
         }
-        $organization->load(['users', 'trucks', 'documents', 'driverProfiles.user', 'paymentContract']);
+        $organization->load(array_filter([
+            $organization->isCustomer() ? 'users.documents' : 'users',
+            'trucks',
+            'documents',
+            'driverProfiles.user',
+            'paymentContract',
+        ]));
 
         return ApiResponse::success(OrganizationResource::make($organization)->additional([
             'users' => $organization->users,
@@ -145,14 +151,23 @@ class OrganizationController extends Controller
 
     public function verify(Request $request, Organization $organization): JsonResponse
     {
-        abort_unless($request->user()->can(Permissions::PROVIDERS_VERIFY), 403);
+        $allowed = $organization->isCustomer()
+            ? $request->user()->can(Permissions::CUSTOMERS_MANAGE)
+            : $request->user()->can(Permissions::PROVIDERS_VERIFY);
+        abort_unless($allowed, 403);
         $data = $request->validate([
             'status' => ['required', Rule::enum(OrganizationStatus::class)],
             'verification_notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $organization->fill($data)->save();
-        AuditLogger::record('provider.verified', $organization, [], $data, $request->user());
+        AuditLogger::record(
+            $organization->isCustomer() ? 'customer.verified' : 'provider.verified',
+            $organization,
+            [],
+            $data,
+            $request->user(),
+        );
         $this->notifier->organizationStatusChanged($organization->fresh(), $request->user());
 
         return ApiResponse::success(OrganizationResource::make($organization), 'Organization status updated.');

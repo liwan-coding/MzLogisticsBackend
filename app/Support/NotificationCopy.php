@@ -202,6 +202,30 @@ final class NotificationCopy
                 'body_ar' => 'سجّلت شركة :name وتنتظر المراجعة.',
                 'body_en' => ':name registered and is waiting for review.',
             ],
+            'customer.registered' => [
+                'title_ar' => 'عميل بانتظار التفعيل',
+                'title_en' => 'Customer awaiting activation',
+                'body_ar' => 'سجّل :name وينتظر المراجعة.',
+                'body_en' => ':name registered and is waiting for review.',
+            ],
+            'customer.activated' => [
+                'title_ar' => 'تم تفعيل الحساب',
+                'title_en' => 'Account activated',
+                'body_ar' => 'أصبح حساب :name مفعّلاً.',
+                'body_en' => ':name is now active.',
+            ],
+            'customer.rejected' => [
+                'title_ar' => 'رُفض الحساب',
+                'title_en' => 'Account rejected',
+                'body_ar' => 'رُفض حساب :name.',
+                'body_en' => ':name was rejected.',
+            ],
+            'customer.suspended' => [
+                'title_ar' => 'أُوقف الحساب',
+                'title_en' => 'Account suspended',
+                'body_ar' => 'أُوقف حساب :name.',
+                'body_en' => ':name was suspended.',
+            ],
             'payment.receipt_uploaded' => [
                 'title_ar' => 'إيصال تحويل بانتظار التأكيد',
                 'title_en' => 'Transfer receipt awaiting confirmation',

@@ -743,6 +743,23 @@ class ShipmentWorkflowTest extends TestCase
         $this->assertStringNotContainsString('CR-998877', $body);
     }
 
+    public function test_pending_customer_cannot_create_a_shipment(): void
+    {
+        [$customer] = $this->makeCustomerAndProvider();
+        $customer->organization->update(['status' => OrganizationStatus::Pending]);
+
+        $this->actingAs($customer, 'sanctum')->postJson('/api/v1/shipments', [
+            'cargo_type' => 'Sand',
+            'truck_type' => 'flatbed',
+            'weight_tons' => 20,
+            'pickup_address' => 'Sohar Port',
+            'pickup_city' => 'Sohar',
+            'delivery_address' => 'Nizwa',
+            'delivery_city' => 'Nizwa',
+            'required_date' => now()->addDay()->toDateString(),
+        ])->assertUnprocessable()->assertJsonValidationErrors(['customer_organization_id']);
+    }
+
     private function makeCustomerAndProvider(bool $withDriver = false): array
     {
         $customerOrg = Organization::query()->create([

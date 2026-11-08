@@ -180,6 +180,13 @@ class ShipmentService
             ]);
         }
 
+        $organization = $user->organization;
+        if (! $organization || $organization->status !== OrganizationStatus::Active) {
+            throw ValidationException::withMessages([
+                'customer_organization_id' => ['This customer account is not active yet.'],
+            ]);
+        }
+
         return (int) $user->organization_id;
     }
 

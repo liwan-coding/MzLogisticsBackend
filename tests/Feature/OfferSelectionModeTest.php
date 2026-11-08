@@ -52,9 +52,10 @@ class OfferSelectionModeTest extends TestCase
         $this->assertSame($quotationId, $visible->json('data.quotations.0.id'));
         $this->assertSame(500.0, (float) $visible->json('data.quotations.0.total_price'));
 
-        $this->actingAs($customer, 'sanctum')
+        $accepted = $this->actingAs($customer, 'sanctum')
             ->postJson("/api/v1/quotations/{$quotationId}/accept")
             ->assertOk();
+        $this->assertSame('Fast Haul', $accepted->json('data.provider.name'));
 
         $this->assertDatabaseHas('payments', [
             'quotation_id' => $quotationId,
@@ -65,6 +66,10 @@ class OfferSelectionModeTest extends TestCase
     public function test_admin_selection_hides_provider_quotes_and_bills_the_marked_up_price(): void
     {
         [$customer, $provider, $admin] = $this->makeActors();
+        Organization::query()->whereKey($provider->organization_id)->update([
+            'phone' => '+96891234567',
+            'email' => 'haul@example.com',
+        ]);
 
         $this->actingAs($admin, 'sanctum')->putJson('/api/v1/settings/offer-selection', [
             'offer_selection_mode' => 'admin',
@@ -108,11 +113,43 @@ class OfferSelectionModeTest extends TestCase
 
         $this->assertSame(130.0, (float) $accepted->json('data.total_price'));
         $this->assertNull($accepted->json('data.quotation'));
+        $this->assertArrayNotHasKey('provider', $accepted->json('data'));
+        $this->assertStringNotContainsString('Fast Haul', json_encode($accepted->json('data')));
+        $this->assertStringNotContainsString('+96891234567', json_encode($accepted->json('data')));
+        $this->assertStringNotContainsString('haul@example.com', json_encode($accepted->json('data')));
+
+        $customerJob = $this->actingAs($customer, 'sanctum')
+            ->getJson('/api/v1/jobs/'.$accepted->json('data.id'))
+            ->assertOk();
+        $this->assertArrayNotHasKey('provider', $customerJob->json('data'));
+        $this->assertNull($customerJob->json('data.quotation'));
+        $customerPayload = json_encode($customerJob->json('data'));
+        $this->assertStringNotContainsString('Fast Haul', $customerPayload);
+        $this->assertStringNotContainsString('+96891234567', $customerPayload);
+        $this->assertStringNotContainsString('haul@example.com', $customerPayload);
+
+        $listed = $this->actingAs($customer, 'sanctum')->getJson('/api/v1/jobs')->assertOk();
+        $this->assertArrayNotHasKey('provider', $listed->json('data.0'));
+        $this->actingAs($customer, 'sanctum')
+            ->getJson('/api/v1/jobs?search='.urlencode('Fast Haul'))
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $tripId = $customerJob->json('data.trips.0.id');
+        $trip = $this->actingAs($customer, 'sanctum')->getJson("/api/v1/trips/{$tripId}")->assertOk();
+        $this->assertArrayNotHasKey('provider', $trip->json('data.job'));
 
         $providerJob = $this->actingAs($provider, 'sanctum')
             ->getJson('/api/v1/jobs/'.$accepted->json('data.id'))
             ->assertOk();
         $this->assertSame(100.0, (float) $providerJob->json('data.total_price'));
+        $this->assertSame('Fast Haul', $providerJob->json('data.provider.name'));
+        $this->assertSame('+96891234567', $providerJob->json('data.provider.phone'));
+
+        $adminJob = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/jobs/'.$accepted->json('data.id'))
+            ->assertOk();
+        $this->assertSame('Fast Haul', $adminJob->json('data.provider.name'));
 
         $this->assertDatabaseHas('payments', [
             'quotation_id' => $quotation['id'],

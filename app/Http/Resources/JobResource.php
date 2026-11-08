@@ -12,6 +12,7 @@ class JobResource extends JsonResource
     public function toArray(Request $request): array
     {
         $viewer = $request->user();
+        $concealProvider = $this->concealsProviderIdentity($viewer);
         $price = $viewer?->isProvider() && $this->provider_price !== null
             ? $this->provider_price
             : $this->total_price;
@@ -50,10 +51,15 @@ class JobResource extends JsonResource
                 ! $viewer?->isProvider(),
                 fn () => OrganizationResource::make($this->whenLoaded('customerOrganization')),
             ),
-            'provider' => OrganizationResource::make($this->whenLoaded('providerOrganization')),
+            'provider' => $this->when(
+                ! $concealProvider,
+                fn () => OrganizationResource::make($this->whenLoaded('providerOrganization')),
+            ),
             'shipment' => ShipmentResource::make($this->whenLoaded('shipmentRequest')),
             'quotation' => $this->when(
-                $this->relationLoaded('quotation') && ! ($viewer?->isCustomer() && $this->provider_price !== null),
+                $this->relationLoaded('quotation')
+                    && ! $concealProvider
+                    && ! ($viewer?->isCustomer() && $this->provider_price !== null),
                 fn () => QuotationResource::make($this->quotation),
             ),
             'trips' => TripResource::collection($this->whenLoaded('trips')),
@@ -73,6 +79,17 @@ class JobResource extends JsonResource
             ),
             'created_at' => $this->created_at,
         ];
+    }
+
+    private function concealsProviderIdentity(mixed $viewer): bool
+    {
+        if (! $viewer?->isCustomer() || ! $this->relationLoaded('providerOrganization')) {
+            return false;
+        }
+
+        $this->resource->loadMissing('shipmentRequest');
+
+        return (bool) $this->shipmentRequest?->usesAdminOfferSelection();
     }
 
     private function driverCost(): float

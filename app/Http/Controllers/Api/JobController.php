@@ -29,9 +29,11 @@ class JobController extends Controller
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('search'), function ($q) use ($request, $user) {
                 $relations = [
-                    'providerOrganization' => ['name', 'name_ar'],
                     'shipmentRequest' => ['reference', 'pickup_city', 'delivery_city'],
                 ];
+                if (! $user->isCustomer()) {
+                    $relations['providerOrganization'] = ['name', 'name_ar'];
+                }
                 if (! $user->isProvider()) {
                     $relations['customerOrganization'] = ['name', 'name_ar', 'email'];
                 }

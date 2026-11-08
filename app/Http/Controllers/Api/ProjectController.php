@@ -103,7 +103,7 @@ class ProjectController extends Controller
         ])->load([
             'jobs' => function (HasMany $jobs) use ($user) {
                 $this->constrainJobs($jobs, $user);
-                $jobs->with(['customerOrganization', 'providerOrganization'])->latest();
+                $jobs->with(['customerOrganization', 'providerOrganization', 'shipmentRequest'])->latest();
             },
         ]);
     }

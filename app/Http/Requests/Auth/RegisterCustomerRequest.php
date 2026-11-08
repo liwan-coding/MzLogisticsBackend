@@ -16,18 +16,37 @@ class RegisterCustomerRequest extends FormRequest
 
     public function rules(): array
     {
+        $individual = $this->input('account_type') === AccountType::Individual->value;
+
         return [
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:190', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::min(8)],
             'phone' => ['nullable', 'string', 'max:32'],
             'locale' => ['nullable', Rule::in(['ar', 'en'])],
-            'account_type' => ['required', Rule::in([AccountType::Company->value])],
-            'company_name' => ['required', 'string', 'max:190'],
-            'company_name_ar' => ['nullable', 'string', 'max:190'],
+            'account_type' => ['required', Rule::enum(AccountType::class)],
+            'company_name' => [
+                Rule::excludeIf($individual),
+                Rule::requiredIf(! $individual),
+                'string',
+                'max:190',
+            ],
+            'company_name_ar' => [
+                Rule::excludeIf($individual),
+                'nullable',
+                'string',
+                'max:190',
+            ],
             'city' => ['nullable', 'string', 'max:120'],
             'country' => ['nullable', 'string', 'size:2'],
             'address' => ['nullable', 'string', 'max:500'],
+            'id_card' => [
+                Rule::excludeIf(! $individual),
+                Rule::requiredIf($individual),
+                'file',
+                'mimes:jpg,jpeg,png,webp,pdf',
+                'max:5120',
+            ],
         ];
     }
 }

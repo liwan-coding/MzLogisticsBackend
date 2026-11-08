@@ -33,9 +33,23 @@ class QuotationResource extends JsonResource
             'valid_until' => $this->valid_until,
             'status' => $this->status,
             'submitted_on_behalf' => (bool) $this->submitted_on_behalf,
-            'provider' => OrganizationResource::make($this->whenLoaded('providerOrganization')),
+            'provider' => $this->when(
+                ! $this->concealsProviderIdentity($request),
+                fn () => OrganizationResource::make($this->whenLoaded('providerOrganization')),
+            ),
             'shipment' => ShipmentResource::make($this->whenLoaded('shipmentRequest')),
             'created_at' => $this->created_at,
         ];
+    }
+
+    private function concealsProviderIdentity(Request $request): bool
+    {
+        if (! $request->user()?->isCustomer() || ! $this->relationLoaded('providerOrganization')) {
+            return false;
+        }
+
+        $this->resource->loadMissing('shipmentRequest');
+
+        return (bool) $this->shipmentRequest?->usesAdminOfferSelection();
     }
 }

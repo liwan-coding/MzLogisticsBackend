@@ -408,22 +408,45 @@ class DomainNotifier
         );
     }
 
+    public function customerRegistered(Organization $organization): void
+    {
+        $this->notifyPlatform(
+            Permissions::CUSTOMERS_MANAGE,
+            NotificationCopy::make('customer.registered', ['name' => $organization->name]),
+            'organization',
+            $organization->id,
+        );
+    }
+
     public function organizationStatusChanged(Organization $organization, User $actor): void
     {
-        $event = match ($organization->status) {
-            OrganizationStatus::Active => 'organization.activated',
-            OrganizationStatus::Rejected => 'organization.rejected',
-            OrganizationStatus::Suspended => 'organization.suspended',
-            default => null,
-        };
+        if ($organization->isProvider()) {
+            $event = match ($organization->status) {
+                OrganizationStatus::Active => 'organization.activated',
+                OrganizationStatus::Rejected => 'organization.rejected',
+                OrganizationStatus::Suspended => 'organization.suspended',
+                default => null,
+            };
+            $audience = UserType::Provider;
+        } elseif ($organization->isCustomer()) {
+            $event = match ($organization->status) {
+                OrganizationStatus::Active => 'customer.activated',
+                OrganizationStatus::Rejected => 'customer.rejected',
+                OrganizationStatus::Suspended => 'customer.suspended',
+                default => null,
+            };
+            $audience = UserType::Customer;
+        } else {
+            return;
+        }
 
-        if ($event === null || ! $organization->isProvider()) {
+        if ($event === null) {
             return;
         }
 
         $this->notifyCompany(
             $organization->id,
-            UserType::Provider,
+            $audience,
             NotificationCopy::make($event, ['name' => $organization->name]),
             'organization',
             $organization->id,

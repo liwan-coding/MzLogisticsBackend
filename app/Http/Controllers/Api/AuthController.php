@@ -28,7 +28,7 @@ class AuthController extends Controller
         return ApiResponse::success([
             'token' => $result['token'],
             'user' => UserResource::make($result['user']),
-        ], 'Account created.', 201);
+        ], 'Account created and pending review.', 201);
     }
 
     public function registerProvider(RegisterProviderRequest $request): JsonResponse

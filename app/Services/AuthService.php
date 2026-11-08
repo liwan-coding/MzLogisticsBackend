@@ -6,12 +6,14 @@ use App\Enums\AccountType;
 use App\Enums\OrganizationStatus;
 use App\Enums\OrganizationType;
 use App\Enums\UserType;
+use App\Enums\DocumentType;
 use App\Models\DriverActivationToken;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\PhoneNumber;
 use App\Support\ReferenceGenerator;
 use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -22,6 +24,7 @@ class AuthService
     public function __construct(
         private readonly PaymentContractService $paymentContracts,
         private readonly DomainNotifier $notifier,
+        private readonly DocumentService $documents,
     ) {}
 
     /**
@@ -30,30 +33,33 @@ class AuthService
      */
     public function registerCustomer(array $payload): array
     {
-        return $this->issueToken($this->provisionCustomer($payload));
+        return $this->issueToken($this->provisionCustomer($payload, OrganizationStatus::Pending));
     }
 
     /**
-     * Create an active customer organization and its sign-in user.
+     * Create a customer organization and its sign-in user.
+     *
+     * Self-registration stays pending until review. Admin provisioning is active.
      *
      * @param  array<string, mixed>  $payload
      */
-    public function provisionCustomer(array $payload): User
+    public function provisionCustomer(array $payload, OrganizationStatus $status = OrganizationStatus::Active): User
     {
-        return DB::transaction(function () use ($payload) {
-            $accountType = AccountType::Company;
+        return DB::transaction(function () use ($payload, $status) {
+            $accountType = AccountType::from((string) $payload['account_type']);
+            $individual = $accountType === AccountType::Individual;
 
             $organization = Organization::query()->create([
                 'type' => OrganizationType::Customer,
                 'account_type' => $accountType,
-                'name' => $payload['company_name'],
-                'name_ar' => $payload['company_name_ar'] ?? null,
+                'name' => $individual ? $payload['name'] : $payload['company_name'],
+                'name_ar' => $individual ? null : ($payload['company_name_ar'] ?? null),
                 'email' => $payload['email'],
                 'phone' => $payload['phone'] ?? null,
                 'city' => $payload['city'] ?? null,
                 'country' => $payload['country'] ?? 'OM',
                 'address' => $payload['address'] ?? null,
-                'status' => OrganizationStatus::Active,
+                'status' => $status,
             ]);
 
             $user = User::query()->create([
@@ -68,7 +74,17 @@ class AuthService
             ]);
 
             $user->assignRole('Company Admin');
+
+            $idCard = $payload['id_card'] ?? null;
+            if ($idCard instanceof UploadedFile) {
+                $this->documents->store($user, $idCard, DocumentType::Identity, null, $user);
+            }
+
             $this->paymentContracts->ensureForCustomer($organization);
+
+            if ($status === OrganizationStatus::Pending) {
+                $this->notifier->customerRegistered($organization);
+            }
 
             return $user->load('organization');
         });

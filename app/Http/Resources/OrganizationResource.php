@@ -2,6 +2,10 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\DocumentType;
+use App\Models\Document;
+use App\Models\Organization;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -29,8 +33,24 @@ class OrganizationResource extends JsonResource
             'uses_default_commission' => $this->commission_rate === null,
             'payment_contract' => PaymentContractResource::make($this->whenLoaded('paymentContract')),
             'documents' => DocumentResource::collection($this->whenLoaded('documents')),
+            'identity_documents' => $this->when(
+                $this->resource instanceof Organization && $this->isCustomer() && $this->relationLoaded('users'),
+                fn () => DocumentResource::collection($this->identityDocuments()),
+            ),
             'created_at' => $this->created_at,
         ];
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Document>
+     */
+    private function identityDocuments()
+    {
+        return $this->users
+            ->filter(fn ($user) => $user instanceof User && $user->relationLoaded('documents'))
+            ->flatMap(fn (User $user) => $user->documents)
+            ->filter(fn (Document $document) => $document->type === DocumentType::Identity)
+            ->values();
     }
 
     private function enumValue(mixed $value): mixed
